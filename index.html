@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Breakfast Check-in</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#111827" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <style>
+    :root{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      --bg:#0b1220;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --ink:#111827;
+      --danger:#b91c1c;
+      --ok:#065f46;
+      --line:#e5e7eb;
+      --radius:18px;
+    }
+    body{margin:0;background:#f6f7fb;color:var(--ink)}
+    header{
+      position:sticky;top:0;z-index:10;
+      background:var(--bg);color:#fff;
+      padding:14px 16px calc(14px + env(safe-area-inset-top));
+    }
+    header h1{margin:0;font-size:18px;letter-spacing:.2px}
+    main{padding:16px;max-width:980px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:860px){.grid{grid-template-columns:1fr 1fr}}
+    .card{
+      background:var(--card);border-radius:var(--radius);
+      box-shadow:0 2px 14px rgba(0,0,0,.06);
+      padding:14px;
+    }
+    .row{display:grid;grid-template-columns:1fr;gap:12px}
+    label{font-size:13px;color:#374151}
+    input{
+      width:100%;box-sizing:border-box;border:2px solid var(--line);
+      border-radius:20px;padding:18px 18px;font-size:38px;
+      outline:none;
+    }
+    input:focus{border-color:#111827}
+    input.small{font-size:34px}
+    .btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+    button{
+      border:0;border-radius:18px;
+      padding:16px 18px;font-size:18px;font-weight:700;
+      background:#111827;color:#fff;cursor:pointer;
+    }
+    button.secondary{background:#e5e7eb;color:#111827}
+    button.danger{background:var(--danger)}
+    .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill.ok{background:#dcfce7;color:#166534}
+    .pill.no{background:#eef2ff;color:#3730a3}
+    .muted{color:var(--muted);font-size:12px}
+    .list{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      font-size:12px;white-space:pre-wrap;line-height:1.35;
+      background:#0b1220;color:#e5e7eb;border-radius:16px;padding:12px;
+      max-height:360px;overflow:auto;
+    }
+    /* Modal */
+    .overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.55);
+      display:none;align-items:center;justify-content:center;z-index:50;
+      padding:18px;
+    }
+    .modal{
+      width:min(760px,100%);background:#fff;border-radius:22px;
+      box-shadow:0 20px 60px rgba(0,0,0,.35);
+      padding:18px 18px 14px;
+    }
+    .modal h2{margin:0 0 10px;font-size:22px}
+    .modal .content{font-size:18px;line-height:1.35;white-space:pre-wrap}
+    .ro-tag{
+      display:inline-block;background:#fee2e2;color:#b91c1c;
+      padding:6px 12px;border-radius:999px;font-weight:900;
+      font-size:22px;letter-spacing:.6px;
+      margin-bottom:10px;
+    }
+    .modal .actions{display:flex;gap:12px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+    .modal .actions button{min-width:140px;padding:14px 16px;font-size:18px}
+    .kbd{font-family:ui-monospace,monospace;background:#f3f4f6;border-radius:8px;padding:2px 6px}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Breakfast Check-in (WebApp ใช้ได้ทั้ง iPad/Notebook)</h1>
+</header>
+
+<main>
+  <div class="grid">
+    <div class="card">
+      <div class="btns">
+        <button id="btnLoadInh">โหลด INH (CSV)</button>
+        <button id="btnExport" class="secondary">Export Logs (CSV)</button>
+        <button id="btnImport" class="secondary">Import Logs (CSV)</button>
+        <button id="btnClear" class="danger">ล้าง Logs</button>
+      </div>
+      <div class="muted" style="margin-top:10px">
+        สถานะ INH: <span id="inhStatus" class="pill no">ยังไม่ได้โหลด</span>
+        <span class="muted" id="inhMeta"></span>
+      </div>
+      <input id="fileInh" type="file" accept=".csv,text/csv" style="display:none" />
+      <input id="fileLog" type="file" accept=".csv,text/csv" style="display:none" />
+      <div class="muted" style="margin-top:10px">
+        ไฟล์ INH ต้องมีหัวคอลัมน์: <b>ชื่อ-นามสกุล</b>, <b>ห้อง</b>, <b>แพคเกจ</b> (RO/RB) หรือใช้ภาษาอังกฤษ <b>Guest Full Name</b>, <b>Room</b>, <b>Package</b><br/>
+        * ถ้าแพคเกจไม่ใช่ RO จะถือว่าเป็น RB ทั้งหมด
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>เลขห้อง (เช่น A203 / D610) — กด <span class="kbd">Enter</span> เพื่อไปช่องถัดไป</label>
+          <input id="room" autocomplete="off" autocapitalize="characters" placeholder="D610" />
+        </div>
+        <div>
+          <label>จำนวนท่าน — กด <span class="kbd">Enter</span> เพื่อบันทึกทันที</label>
+          <input id="guests" class="small" inputmode="numeric" autocomplete="off" placeholder="2" />
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="btnSave">บันทึก</button>
+        <button id="btnRefresh" class="secondary">รีเฟรชรายการวันนี้</button>
+      </div>
+
+      <div class="muted" style="margin-top:10px">
+        ✅ ถ้าเป็น <b style="color:#b91c1c">RO</b> จะเด้งเตือนให้เก็บเงิน พร้อมแสดงชื่อแขก
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div><b>รายการล่าสุด (วันนี้)</b></div>
+      <div class="muted" id="today"></div>
+    </div>
+    <div id="recent" class="list" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card muted" style="margin-top:12px">
+    วิธีใช้บน iPad: เปิดลิงก์นี้ใน Safari → Share → <b>Add to Home Screen</b><br/>
+    วิธีใช้บน Notebook: เปิดลิงก์นี้ใน Chrome/Edge → Install app (ถ้าขึ้นไอคอนติดตั้ง)<br/>
+    * ข้อมูล Logs จะเก็บในเครื่องแต่ละเครื่อง (local) หากต้องการย้ายข้ามเครื่อง ให้ใช้ Export/Import Logs
+  </div>
+</main>
+
+<div id="overlay" class="overlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h2 id="mTitle">แจ้งเตือน</h2>
+    <div id="mRo" style="display:none"><span class="ro-tag">RO</span></div>
+    <div id="mBody" class="content"></div>
+    <div class="actions" id="mActions"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  }
+</script>
+</body>
+</html>
