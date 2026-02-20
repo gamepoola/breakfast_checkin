@@ -94,7 +94,7 @@
   <div class="grid">
     <div class="card">
       <div class="btns">
-        <button id="btnLoadInh">โหลด INH (CSV)</button>
+        <button id="btnLoadInh">โหลด INH (CSV/XLSX)</button>
         <button id="btnExport" class="secondary">Export Logs (CSV)</button>
         <button id="btnImport" class="secondary">Import Logs (CSV)</button>
         <button id="btnClear" class="danger">ล้าง Logs</button>
@@ -103,10 +103,10 @@
         สถานะ INH: <span id="inhStatus" class="pill no">ยังไม่ได้โหลด</span>
         <span class="muted" id="inhMeta"></span>
       </div>
-      <input id="fileInh" type="file" accept=".csv,text/csv" style="display:none" />
-      <input id="fileLog" type="file" accept=".csv,text/csv" style="display:none" />
+      <input id="fileInh" type="file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" style="display:none" />
+      <input id="fileLog" type="file" accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" style="display:none" />
       <div class="muted" style="margin-top:10px">
-        ไฟล์ INH ต้องมีหัวคอลัมน์: <b>ชื่อ-นามสกุล</b>, <b>ห้อง</b>, <b>แพคเกจ</b> (RO/RB) หรือใช้ภาษาอังกฤษ <b>Guest Full Name</b>, <b>Room</b>, <b>Package</b><br/>
+        ไฟล์ INH (CSV/XLSX) ต้องมีหัวคอลัมน์: <b>ชื่อ-นามสกุล</b>, <b>ห้อง</b>, <b>แพคเกจ</b> (RO/RB) หรือใช้ภาษาอังกฤษ <b>Guest Full Name</b>, <b>Room</b>, <b>Package</b><br/>
         * ถ้าแพคเกจไม่ใช่ RO จะถือว่าเป็น RB ทั้งหมด
       </div>
     </div>
@@ -158,6 +158,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

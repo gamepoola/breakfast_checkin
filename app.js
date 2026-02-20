@@ -55,8 +55,24 @@ function normName(s){
   return t;
 }
 
-// Minimal CSV parser supporting quotes
-function csvParse(text){
+// Minimal CSV parser supporting quotes + auto-detect delimiter (comma/semicolon/tab)
+// NOTE: Excel (ภาษาไทย/ยุโรป) มัก export CSV เป็น ';' ทำให้หา Room ไม่เจอถ้า parser คิดว่าเป็น ','
+function guessDelimiter(text){
+  const lines = String(text||'').split(/\r?\n/).filter(l=>l.trim().length>0);
+  const first = lines[0] || '';
+  const count = (ch)=> (first.match(new RegExp('\\'+ch,'g'))||[]).length;
+  const cComma = count(',');
+  const cSemi  = count(';');
+  const cTab   = count('\t');
+  const max = Math.max(cComma, cSemi, cTab);
+  if (max === 0) return ','; // fallback
+  if (max === cSemi) return ';';
+  if (max === cTab) return '\t';
+  return ',';
+}
+
+function csvParse(text, delimiter){
+  const delim = delimiter || guessDelimiter(text);
   const rows = [];
   let i=0, field='', row=[], inQ=false;
   while (i < text.length){
@@ -68,7 +84,7 @@ function csvParse(text){
       } else field += c;
     } else {
       if (c === '"') inQ = true;
-      else if (c === ','){ row.push(field); field=''; }
+      else if (c === delim){ row.push(field); field=''; }
       else if (c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
       else if (c === '\r'){ /* ignore */ }
       else field += c;
@@ -76,7 +92,12 @@ function csvParse(text){
     i++;
   }
   if (field.length || row.length){ row.push(field); rows.push(row); }
-  return rows.map(r=>r.map(x=>String(x ?? '').trim()));
+  // trim + strip BOM
+  return rows.map((r,ri)=>r.map((x,ci)=>{
+    let s = String(x ?? '').trim();
+    if (ri===0 && ci===0) s = s.replace(/^\uFEFF/, ''); // BOM
+    return s;
+  }));
 }
 
 function saveLocal(key,val){ localStorage.setItem(key, JSON.stringify(val)); }
@@ -156,11 +177,14 @@ function buildInhMapFromCsv(text, filename){
     return -1;
   };
 
-  const iRoom = idx(['ROOM','ห้อง']);
-  const iPkg  = idx(['PACKAGE','PKG','แพคเกจ','MEALPLAN','MEALPLAN_OR_COMMENT']);
-  const iName = idx(['GUEST FULL NAME','NAME','ชื่อ-นามสกุล','ALLNAMES','PRIMARYNAME']);
+  const iRoom = idx(['ROOM','ห้อง','เลขห้อง','ROOM NO','ROOMNO','ROOM NUMBER','ROOMNUMBER','RM','RMS']);
+  const iPkg  = idx(['PACKAGE','PKG','แพคเกจ','MEALPLAN','MEAL PLAN','MEALPLAN_OR_COMMENT','PACKAGES','RATE PLAN','RATEPLAN']);
+  const iName = idx(['GUEST FULL NAME','GUEST NAME','GUESTNAME','FULL NAME','FULLNAME','NAME','ชื่อ-นามสกุล','ชื่อแขก','ALLNAMES','PRIMARYNAME']);
 
-  if (iRoom === -1) throw new Error('ไม่พบคอลัมน์ "Room/ห้อง"');
+  if (iRoom === -1) {
+  const delim = guessDelimiter(text);
+  throw new Error(`ไม่พบคอลัมน์ "Room/ห้อง"\nตัวคั่น CSV ที่ตรวจพบ: "${delim === "\t" ? "TAB" : delim}"\nหัวคอลัมน์ที่พบ: ${header.join(" | ")}`);
+}
   if (iName === -1) throw new Error('ไม่พบคอลัมน์ "Guest Full Name/ชื่อ-นามสกุล"');
   if (iPkg === -1) throw new Error('ไม่พบคอลัมน์ "Package/แพคเกจ"');
 
@@ -314,8 +338,33 @@ els.fileInh.addEventListener('change', async (e)=>{
   const file = e.target.files?.[0];
   if (!file) return;
   try{
-    const text = await file.text();
-    buildInhMapFromCsv(text, file.name);
+    const name = file.name || '';
+    const ext = name.toLowerCase().split('.').pop();
+
+    if (ext === 'xlsx'){
+      if (typeof XLSX === 'undefined'){
+        throw new Error('ยังโหลดโมดูล XLSX ไม่สำเร็จ (ลองรีเฟรชหน้าเว็บ แล้วลองใหม่)');
+      }
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const sheetName = wb.SheetNames?.[0];
+      if (!sheetName) throw new Error('ไม่พบชีตในไฟล์ Excel');
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''}); // array of arrays
+      // Convert to CSV text (comma) so reuse parser logic
+      const esc = (v)=>{
+        const s = String(v ?? '');
+        if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+        return s;
+      };
+      const csv = rows.map(r=>r.map(esc).join(',')).join('\n');
+      buildInhMapFromCsv(csv, name);
+    } else {
+      // csv or others
+      const text = await file.text();
+      buildInhMapFromCsv(text, name);
+    }
+
     await showModal({title:'สำเร็จ', body:'โหลด INH เรียบร้อย'});
   }catch(err){
     await showModal({title:'โหลด INH ไม่สำเร็จ', body: err?.message || String(err)});
